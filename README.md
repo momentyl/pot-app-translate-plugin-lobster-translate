@@ -23,7 +23,7 @@
 
 第一次安装可以先看下面的安装演示：
 
-![安装插件演示](./docs/install-tutorial.webp)
+[Bilibili 安装教程](https://www.bilibili.com/video/BV1MuQwB2EJZ/)
 
 ## 为什么有人会用它
 
