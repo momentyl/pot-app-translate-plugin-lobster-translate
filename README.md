@@ -63,6 +63,12 @@
 
 ## 3 分钟上手
 
+插件配置面板长这样。你可以直接把自己常用平台的 `apiFormat`、`baseUrl`、`apiKey` 和 `model` 填进去，不限某一家服务：
+
+<p align="center">
+  <img src="./docs/images/config_image.png" alt="大龙虾翻译插件配置界面" width="720" />
+</p>
+
 安装 `.potext` 后，通常只填这 4 项就够了：
 
 | 配置项 | 你可以怎么理解 |
