@@ -63,59 +63,64 @@ async function translate(text, from, to, options) {
         streamOutput = "off",
         systemPrompt
     } = config;
-    const format = normalizeApiFormat(apiFormat);
+    try {
+        const format = normalizeApiFormat(apiFormat);
 
-    if (!baseUrl || !baseUrl.trim()) {
-        throw "Missing required config: baseUrl";
-    }
-    if (!apiKey || !apiKey.trim()) {
-        throw "Missing required config: apiKey";
-    }
-    if (!model || !model.trim()) {
-        throw "Missing required config: model";
-    }
-
-    const sourceLanguage = from === "auto" ? (detect || "auto") : from;
-    const promptMode = resolvePromptMode(systemPrompt, text, to);
-    const userPrompt = buildUserPrompt(text, sourceLanguage, to);
-    const effectiveSystemPrompt = resolveSystemPrompt(systemPrompt, promptMode, sourceLanguage, to);
-    const url = buildEndpoint(baseUrl, format);
-    const request = buildRequest(format, model.trim(), effectiveSystemPrompt, userPrompt, text);
-    const headers = buildHeaders(format, apiKey.trim());
-    const shouldStream = streamOutput === "on" && typeof options.setResult === "function";
-
-    if (shouldStream) {
-        const streamedResult = await tryStreamTranslate({
-            format,
-            url,
-            headers,
-            request,
-            setResult: options.setResult
+        validateConfig({
+            apiFormat: format,
+            baseUrl,
+            apiKey,
+            model
         });
-        if (streamedResult) {
-            return streamedResult;
+
+        const sourceLanguage = from === "auto" ? (detect || "auto") : from;
+        const promptMode = resolvePromptMode(systemPrompt, text, to);
+        const userPrompt = buildUserPrompt(text, sourceLanguage, to);
+        const effectiveSystemPrompt = resolveSystemPrompt(systemPrompt, promptMode, sourceLanguage, to);
+        const url = buildEndpoint(baseUrl, format);
+        const request = buildRequest(format, model.trim(), effectiveSystemPrompt, userPrompt, text);
+        const headers = buildHeaders(format, apiKey.trim());
+        const shouldStream = streamOutput === "on" && typeof options.setResult === "function";
+
+        if (shouldStream) {
+            const streamedResult = await tryStreamTranslate({
+                format,
+                url,
+                headers,
+                request,
+                setResult: options.setResult
+            });
+            if (streamedResult) {
+                return streamedResult;
+            }
         }
-    }
 
-    const res = await fetch(url, {
-        method: "POST",
-        url: url,
-        headers: headers,
-        body: {
-            type: "Json",
-            payload: request
+        const res = await fetch(url, {
+            method: "POST",
+            url: url,
+            headers: headers,
+            body: {
+                type: "Json",
+                payload: request
+            }
+        });
+
+        if (!res.ok) {
+            throw formatHttpError(format, url, res.status, res.data);
         }
-    });
 
-    if (!res.ok) {
-        throw formatHttpError(format, url, res.status, res.data);
+        const result = extractText(format, res.data);
+        if (!result) {
+            throw `Empty translation result\n${JSON.stringify(res.data)}`;
+        }
+        return result.trim();
+    } catch (error) {
+        const userFacingError = formatUserFacingError(error);
+        if (typeof options.setResult === "function") {
+            options.setResult(userFacingError);
+        }
+        return userFacingError;
     }
-
-    const result = extractText(format, res.data);
-    if (!result) {
-        throw `Empty translation result\n${JSON.stringify(res.data)}`;
-    }
-    return result.trim();
 }
 
 function normalizeApiFormat(apiFormat) {
@@ -623,6 +628,99 @@ function isApiFormatError(apiFormat, lowerMessage) {
         return true;
     }
     return false;
+}
+
+function validateConfig({ apiFormat, baseUrl, apiKey, model }) {
+    if (!baseUrl || !baseUrl.trim()) {
+        throw "Missing required config: baseUrl";
+    }
+    if (!apiKey || !apiKey.trim()) {
+        throw "Missing required config: apiKey";
+    }
+    if (!model || !model.trim()) {
+        throw "Missing required config: model";
+    }
+    if (!["completions", "responses", "anthropic"].includes(apiFormat)) {
+        throw `Unsupported apiFormat: ${apiFormat}`;
+    }
+}
+
+function formatUserFacingError(error) {
+    const message = `${error || ""}`.trim();
+
+    if (!message) {
+        return buildConfigGuidance("翻译失败，请检查插件配置后重试。");
+    }
+
+    if (message === "Missing required config: baseUrl") {
+        return buildConfigGuidance("缺少基础URL（baseUrl）。", ["baseUrl"]);
+    }
+    if (message === "Missing required config: apiKey") {
+        return buildConfigGuidance("缺少 API 密钥（apiKey）。", ["apiKey"]);
+    }
+    if (message === "Missing required config: model") {
+        return buildConfigGuidance("缺少模型 ID（model）。", ["model"]);
+    }
+    if (message.startsWith("Unsupported apiFormat:")) {
+        return buildConfigGuidance("接口格式（apiFormat）不支持。", ["apiFormat"]);
+    }
+    if (message.startsWith("API authentication failed.")) {
+        return buildConfigGuidance("API 密钥校验失败。", ["apiKey"], message);
+    }
+    if (message.startsWith("Model validation failed.")) {
+        return buildConfigGuidance("模型 ID 不可用或填写错误。", ["model"], message);
+    }
+    if (message.startsWith("Endpoint validation failed.")) {
+        return buildConfigGuidance("基础URL或接口格式不正确。", ["baseUrl", "apiFormat"], message);
+    }
+    if (message.startsWith("API format validation failed.")) {
+        return buildConfigGuidance("接口格式与当前平台不匹配。", ["apiFormat", "baseUrl"], message);
+    }
+    if (message.startsWith("Request validation failed.")) {
+        return buildConfigGuidance("请求参数校验失败，通常是配置项不匹配导致。", ["apiFormat", "model", "baseUrl"], message);
+    }
+
+    return buildConfigGuidance("翻译请求失败。若确认网络正常，请检查插件配置。", [], message);
+}
+
+function buildConfigGuidance(summary, fields, rawMessage) {
+    const uniqueFields = [...new Set(fields || [])];
+    const fieldLabelMap = {
+        apiFormat: "接口格式（apiFormat）",
+        baseUrl: "基础URL（baseUrl）",
+        apiKey: "API密钥（apiKey）",
+        model: "模型ID（model）"
+    };
+
+    const lines = [
+        summary,
+        "请打开 Pot-App 插件配置，检查以下项目："
+    ];
+
+    if (uniqueFields.length > 0) {
+        for (const field of uniqueFields) {
+            lines.push(`- ${fieldLabelMap[field] || field}`);
+        }
+    } else {
+        lines.push("- 基础URL（baseUrl）");
+        lines.push("- API密钥（apiKey）");
+        lines.push("- 模型ID（model）");
+        lines.push("- 接口格式（apiFormat）");
+    }
+
+    lines.push("");
+    lines.push("推荐示例（SiliconFlow）：");
+    lines.push("apiFormat = completions");
+    lines.push("baseUrl = https://api.siliconflow.cn/v1");
+    lines.push("model = deepseek-ai/DeepSeek-V3.2");
+
+    if (rawMessage) {
+        lines.push("");
+        lines.push("详细错误：");
+        lines.push(rawMessage);
+    }
+
+    return lines.join("\n");
 }
 
 function sanitizeOutput(text) {
