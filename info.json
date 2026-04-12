@@ -33,7 +33,7 @@
     },
     {
       "key": "enableThinking",
-      "display": "思考开关（仅 Qwen / GLM / DeepSeek；thinking / instruct 模型不生效）",
+      "display": "思考开关（仅支持 Qwen / GLM / DeepSeek；详情请看插件仓库文档）",
       "type": "select",
       "options": {
         "off": "关闭",
