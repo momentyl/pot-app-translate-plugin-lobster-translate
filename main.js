@@ -60,6 +60,7 @@ async function translate(text, from, to, options) {
         baseUrl,
         apiKey,
         model,
+        enableThinking = "off",
         streamOutput = "off",
         systemPrompt
     } = config;
@@ -78,7 +79,9 @@ async function translate(text, from, to, options) {
         const userPrompt = buildUserPrompt(text, sourceLanguage, to);
         const effectiveSystemPrompt = resolveSystemPrompt(systemPrompt, promptMode, sourceLanguage, to);
         const url = buildEndpoint(baseUrl, format);
-        const request = buildRequest(format, model.trim(), effectiveSystemPrompt, userPrompt, text);
+        const request = buildRequest(format, model.trim(), effectiveSystemPrompt, userPrompt, text, {
+            enableThinking: shouldInjectEnableThinking(format, model, enableThinking)
+        });
         const headers = buildHeaders(format, apiKey.trim());
         const shouldStream = streamOutput === "on" && typeof options.setResult === "function";
 
@@ -503,9 +506,9 @@ function parseJsonSafely(text) {
     }
 }
 
-function buildRequest(apiFormat, model, systemPrompt, userPrompt, text) {
+function buildRequest(apiFormat, model, systemPrompt, userPrompt, text, options = {}) {
     if (apiFormat === "completions") {
-        return {
+        const request = {
             model: model,
             messages: [
                 { role: "system", content: systemPrompt },
@@ -513,6 +516,10 @@ function buildRequest(apiFormat, model, systemPrompt, userPrompt, text) {
             ],
             temperature: 0.2
         };
+        if (options.enableThinking) {
+            request.enable_thinking = true;
+        }
+        return request;
     }
 
     if (apiFormat === "responses") {
@@ -548,6 +555,25 @@ function buildRequest(apiFormat, model, systemPrompt, userPrompt, text) {
     }
 
     throw `Unsupported apiFormat: ${apiFormat}`;
+}
+
+function shouldInjectEnableThinking(apiFormat, model, enableThinking) {
+    if (enableThinking !== "on" || apiFormat !== "completions") {
+        return false;
+    }
+
+    const normalizedModel = `${model || ""}`.trim().toLowerCase();
+    if (!normalizedModel) {
+        return false;
+    }
+
+    if (normalizedModel.includes("thinking") || normalizedModel.includes("instruct")) {
+        return false;
+    }
+
+    return normalizedModel.includes("qwen") ||
+        normalizedModel.includes("glm") ||
+        normalizedModel.includes("deepseek");
 }
 
 function extractText(apiFormat, data) {

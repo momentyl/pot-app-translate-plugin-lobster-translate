@@ -32,6 +32,16 @@
       "type": "input"
     },
     {
+      "key": "enableThinking",
+      "display": "思考开关（仅 Qwen / GLM / DeepSeek；thinking / instruct 模型不生效）",
+      "type": "select",
+      "options": {
+        "off": "关闭",
+        "on": "开启"
+      },
+      "default": "off"
+    },
+    {
       "key": "streamOutput",
       "display": "流式输出（实验性）",
       "type": "select",

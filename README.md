@@ -77,6 +77,7 @@
 | `baseUrl` | 平台地址 |
 | `apiKey` | 你的密钥 |
 | `model` | 你想用的模型 |
+| `思考开关` | 仅对 `Qwen / GLM / DeepSeek` 生效，会注入 `enable_thinking=true`；模型名包含 `thinking` 或 `instruct` 时不会注入 |
 
 ### 例子：SiliconFlow
 
@@ -96,6 +97,13 @@ apiFormat = completions
 baseUrl   = https://www.packyapi.com/v1
 model     = glm-5
 ```
+
+### 思考开关说明
+
+- 该开关目前只对 `OpenAI Chat Completions` 格式下的 `Qwen / GLM / DeepSeek` 模型做适配
+- 开启后，插件会自动在请求中追加 `enable_thinking = true`
+- 如果模型名里包含 `thinking` 或 `instruct`，插件不会追加这个参数
+- `responses` 和 `anthropic` 两种接口格式不会使用这个开关
 
 ## 不想研究 URL 细节？
 
