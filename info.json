@@ -2,7 +2,7 @@
   "id": "plugin.com.pot-app.lobster-translate",
   "plugin_type": "translate",
   "icon": "lobster-translate.svg",
-  "display": "大龙虾翻译",
+  "display": "GLM翻译",
   "homepage": "https://github.com/claw-codes/pot-app-translate-plugin-lobster-translate",
   "needs": [
     {
